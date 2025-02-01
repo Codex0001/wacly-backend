@@ -1,5 +1,33 @@
 {
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
     "react-icons": "^5.4.0"
-  }
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "name": "wacly-hrms",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Codex0001/wacly-hrms.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Codex0001/wacly-hrms/issues"
+  },
+  "homepage": "https://github.com/Codex0001/wacly-hrms#readme"
 }
