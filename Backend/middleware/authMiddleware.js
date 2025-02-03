@@ -32,9 +32,3 @@ const adminOnly = (req, res, next) => {
 
 module.exports = { protect, adminOnly };
 
-export const logout = () => {
-    localStorage.removeItem("token"); // Remove JWT token if stored
-    localStorage.removeItem("user"); // Remove user info if stored
-    sessionStorage.clear(); // Optional: Clear session storage
-    window.location.href = "/login"; // Redirect to login page
-  };
