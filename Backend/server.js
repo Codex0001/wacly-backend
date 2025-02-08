@@ -1,29 +1,43 @@
+require("dotenv").config();
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
-const { sequelize, connectDB } = require("./config/db");
+const { sequelize } = require("./config/db");
+const Employee = require("./models/Employee");
 
-// Load environment variables
-dotenv.config();
-
-// Connect to MySQL database
-connectDB();
-
-// Initialize app
 const app = express();
-app.use(cors());
+
+// Middleware
 app.use(express.json());
+app.use(cors());
 
-// Routes
-app.use("/api/users", require("./routes/userRoutes"));
+// Import Routes
+const authRoutes = require("./routes/authRoutes"); // ✅ Import routes
+app.use("/api/auth", authRoutes); // ✅ Register auth routes
 
+// Test Route
 app.get("/", (req, res) => {
     res.send("API is running...");
 });
 
-// Start server
+// Sync Database
+sequelize.sync()
+    .then(() => console.log("✅ All tables synced successfully!"))
+    .catch((err) => console.error("❌ Database sync error:", err));
+
+// Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
-    console.log(`Server running on port ${PORT}`);
-    await sequelize.sync(); // Sync models with database
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+        // Log top-level routes
+        console.log(`🛠 Registered Route: ${Object.keys(middleware.route.methods)[0].toUpperCase()} ${middleware.route.path}`);
+    } else if (middleware.name === "router") {
+        // Log nested routes (like those inside authRoutes)
+        middleware.handle.stack.forEach((handler) => {
+            if (handler.route) {
+                console.log(`🛠 Registered Route: ${Object.keys(handler.route.methods)[0].toUpperCase()} /api/auth${handler.route.path}`);
+            }
+        });
+    }
 });
