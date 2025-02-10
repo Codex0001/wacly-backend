@@ -71,7 +71,6 @@ router.post("/register", async (req, res) => {
         console.error("❌ Error in Register Route:", error);
         res.status(500).json({ message: "Server Error", error: error.message || error });
     }
-    
 });
 
 // Login Employee
@@ -101,6 +100,34 @@ router.post("/login", async (req, res) => {
         res.status(200).json({ message: "Login successful", token, role: employee.role });
     } catch (error) {
         res.status(500).json({ message: "Server Error", error });
+    }
+});
+
+// Fetch User Profile
+router.get("/profile", async (req, res) => {
+    try {
+        // Extract token from Authorization header
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ message: "No token provided" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Fetch user details
+        const employee = await Employee.findByPk(decoded.id, {
+            attributes: { exclude: ["password"] }, // Exclude password from the response
+        });
+
+        if (!employee) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({ message: "Profile fetched successfully", employee });
+    } catch (error) {
+        console.error("❌ Error in Profile Route:", error);
+        res.status(500).json({ message: "Server Error", error: error.message || error });
     }
 });
 

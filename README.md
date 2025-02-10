@@ -1,19 +1,22 @@
 # wacly-hrms
  
-{
+    {
     "name": "John Doe",
     "email": "john.doe@example.com",
     "phone_number": "0711223344",
     "password": "Manager@123",
     "role": "manager",
     "createdByRole": "admin"
-}
+    }
 
-    name: "Admin User",
-    email: adminEmail,
-    phone_number: "1234567890",
-    password: Admin@123,
-    role: "admin"
+    {
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "phone_number": "1234567890",
+    "password": "Admin@123",
+    "role": "admin",
+    "createdByRole": "admin"
+    }
 
     {
     "name": "Jane Smith",

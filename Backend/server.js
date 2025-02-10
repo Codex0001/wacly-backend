@@ -1,43 +1,89 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const { sequelize } = require("./config/db");
-const Employee = require("./models/Employee");
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { Sequelize, DataTypes } = require('sequelize');
 
+// Initialize Sequelize
+const sequelize = new Sequelize(
+    process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
+    host: process.env.DB_HOST,
+    dialect: 'mysql',
+});
+
+// Define the LeaveType model
+const LeaveType = sequelize.define('LeaveType', {
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    daysAllowed: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+    },
+    carryForward: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+    },
+    description: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    requiresApproval: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+    },
+    status: {
+        type: DataTypes.ENUM('Active', 'Inactive'),
+        defaultValue: 'Active',
+    },
+}, {
+    timestamps: true, // Adds createdAt and updatedAt fields
+    tableName: 'LeaveTypes', // Explicitly define the table name
+});
+
+// Test database connection
+sequelize.authenticate()
+    .then(() => {
+        console.log('✅ Database connection has been established successfully.');
+    })
+    .catch((err) => {
+        console.error('❌ Unable to connect to the database:', err);
+    });
+
+// Sync models with the database
+sequelize.sync({ force: false }) // Set `force: true` to drop and recreate tables (use with caution!)
+    .then(() => {
+        console.log('✅ All tables synced successfully!');
+    })
+    .catch((err) => {
+        console.error('❌ Database sync error:', err);
+    });
+
+// Initialize Express app
 const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+    credentials: true,
+}));
 
-// Import Routes
-const authRoutes = require("./routes/authRoutes"); // ✅ Import routes
-app.use("/api/auth", authRoutes); // ✅ Register auth routes
+// Routes
+const authRoutes = require('./routes/authRoutes');
+const leaveTypesRoutes = require('./routes/leaveTypesRoutes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/leave-types', leaveTypesRoutes);
 
 // Test Route
-app.get("/", (req, res) => {
-    res.send("API is running...");
+app.get('/', (req, res) => {
+    res.send('API is running...');
 });
-
-// Sync Database
-sequelize.sync()
-    .then(() => console.log("✅ All tables synced successfully!"))
-    .catch((err) => console.error("❌ Database sync error:", err));
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
-app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-        // Log top-level routes
-        console.log(`🛠 Registered Route: ${Object.keys(middleware.route.methods)[0].toUpperCase()} ${middleware.route.path}`);
-    } else if (middleware.name === "router") {
-        // Log nested routes (like those inside authRoutes)
-        middleware.handle.stack.forEach((handler) => {
-            if (handler.route) {
-                console.log(`🛠 Registered Route: ${Object.keys(handler.route.methods)[0].toUpperCase()} /api/auth${handler.route.path}`);
-            }
-        });
-    }
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
 });
