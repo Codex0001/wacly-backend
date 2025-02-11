@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Sequelize, DataTypes } = require('sequelize');
+const employeeRoutes = require('./routes/employeeRoutes');
 
 // Initialize Sequelize
 const sequelize = new Sequelize(
@@ -67,6 +68,7 @@ app.use(express.json());
 app.use(cors({
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
 }));
 
@@ -76,6 +78,7 @@ const leaveTypesRoutes = require('./routes/leaveTypesRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leave-types', leaveTypesRoutes);
+app.use('/api/employees', employeeRoutes); // Register employee routes
 
 // Test Route
 app.get('/', (req, res) => {

@@ -124,12 +124,20 @@ router.get("/profile", async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json({ message: "Profile fetched successfully", employee });
-    } catch (error) {
-        console.error("❌ Error in Profile Route:", error);
-        res.status(500).json({ message: "Server Error", error: error.message || error });
-    }
-});
+        if (!employee) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+      
+          res.json({
+            name: employee.name,
+            role: employee.role,
+            avatar: employee.avatar
+          });
+        } catch (error) {
+          console.error('Profile error:', error);
+          res.status(401).json({ error: 'Invalid token' });
+        }
+      });
 
 // Seed Initial Admin
 router.post("/seed-admin", async (req, res) => {

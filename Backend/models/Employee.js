@@ -2,13 +2,12 @@ const { DataTypes } = require("sequelize");
 const { sequelize } = require("../config/db");
 const { v4: uuidv4 } = require("uuid");  // Import UUID generator
 
-const Employee = sequelize.define("Employee", {
+const Employee = sequelize.define('Employee', {
     emp_id: {
-        type: DataTypes.STRING,
-        primaryKey: true,
-        allowNull: false,
-        unique: true,
-        defaultValue: () => `WACLY-HRMS${uuidv4().slice(0, 8)}`, // Auto-generate ID
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false,
+      unique: true
     },
     name: {
         type: DataTypes.STRING,
@@ -41,4 +40,4 @@ sequelize.sync({ alter: true })
     .then(() => console.log("✅ Employee table synced successfully!"))
     .catch((err) => console.error("❌ Error syncing Employee table:", err));
 
-module.exports = Employee;
+    module.exports = sequelize.model('Employee', Employee);
