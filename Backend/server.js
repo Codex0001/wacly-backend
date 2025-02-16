@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const { Sequelize, DataTypes } = require('sequelize');
 const employeeRoutes = require('./routes/employeeRoutes');
+const departmentRoutes = require('./routes/departmentRoutes'); // Ensure this is imported
+const Department = require('./models/Department');
+const Employee = require('./models/Employee');
 
 // Initialize Sequelize
 const sequelize = new Sequelize(
@@ -52,19 +55,30 @@ sequelize.authenticate()
     });
 
 // Sync models with the database
-sequelize.sync({ force: false }) // Set `force: true` to drop and recreate tables (use with caution!)
-    .then(() => {
-        console.log('✅ All tables synced successfully!');
-    })
-    .catch((err) => {
-        console.error('❌ Database sync error:', err);
-    });
+const syncModels = async () => {
+    try {
+      // First sync Department
+      await Department.sync({ alter: true });
+      console.log('✅ Department table synced successfully!');
+      
+      // Then sync Employee
+      await Employee.sync({ alter: true });
+      console.log('✅ Employee table synced successfully!');
+      
+      // Add associations after syncing
+    Department.hasMany(Employee, { foreignKey: 'departmentId' });
+    Employee.belongsTo(Department, { foreignKey: 'departmentId' });
+      
+    } catch (error) {
+      console.error('❌ Error syncing tables:', error);
+    }
+  };
 
 // Initialize Express app
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(express.json()); // Ensure this line is present
 app.use(cors({
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'], 
@@ -75,10 +89,14 @@ app.use(cors({
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const leaveTypesRoutes = require('./routes/leaveTypesRoutes');
+const leaveRequestsRoutes = require('./routes/leaveRequestsRoutes');
+const departmentsRoutes = require('./routes/departmentRoutes'); // Ensure this is used
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leave-types', leaveTypesRoutes);
-app.use('/api/employees', employeeRoutes); // Register employee routes
+app.use('/api/employees', employeeRoutes); 
+app.use('/api/leave-requests', leaveRequestsRoutes);
+app.use('/api/departments', departmentsRoutes); // Ensure this is used
 
 // Test Route
 app.get('/', (req, res) => {
