@@ -14,7 +14,7 @@ router.use(protect);
 router.post('/', restrictTo('admin'), departmentController.createDepartment);
 router.put('/:id', restrictTo('admin'), departmentController.updateDepartment);
 router.delete('/:id', restrictTo('admin'), departmentController.deleteDepartment);
-
+router.get('/export', protect, restrictTo('admin'), departmentController.exportDepartments);
 // Add transfer route
 router.post('/transfer', restrictTo('admin'), departmentController.transferEmployee);
 

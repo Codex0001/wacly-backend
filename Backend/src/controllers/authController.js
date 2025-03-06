@@ -1,77 +1,85 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
-const { User } = require('../models');
+const { User, Department } = require('../models');
 const { sequelize } = require('../config/db');
 
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password required' });
-    }
-
-    // Case-sensitive direct match
-    const user = await User.findOne({
-      where: { email }
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-
-    // Generate tokens
-    const accessToken = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '15m' }
-    );
-
-    const refreshToken = jwt.sign(
-      { id: user.id },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // Update refresh token in DB
-    await User.update(
-      { refresh_token: refreshToken },
-      { where: { id: user.id } }
-    );
-
-    // Set secure cookie
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
-    return res.json({
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        first_name: user.first_name,
-        last_name: user.last_name
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+          return res.status(400).json({ message: 'Email and password required' });
       }
-    });
-    
+
+      // Case-sensitive direct match with department information
+      const user = await User.findOne({
+          where: { email },
+          include: [{
+              model: Department,
+              as: 'department',
+              attributes: ['id', 'name']
+          }]
+      });
+
+      if (!user) {
+          return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+          return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Generate tokens
+      const accessToken = jwt.sign(
+          { id: user.id, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: '15m' }
+      );
+
+      const refreshToken = jwt.sign(
+          { id: user.id },
+          process.env.JWT_REFRESH_SECRET,
+          { expiresIn: '7d' }
+      );
+
+      // Update refresh token in DB
+      await User.update(
+          { refresh_token: refreshToken },
+          { where: { id: user.id } }
+      );
+
+      // Set secure cookie
+      res.cookie('refreshToken', refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+
+      return res.json({
+          accessToken,
+          user: {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+              first_name: user.first_name,
+              last_name: user.last_name,
+              department: user.department ? {
+                  id: user.department.id,
+                  name: user.department.name
+              } : null
+          }
+      });
+
   } catch (error) {
-    console.error('Login error debug:', {
-      message: error.message,
-      stack: error.stack,
-      original: error.original
-    });
-    res.status(500).json({ message: 'Authentication failed' });
+      console.error('Login error debug:', {
+          message: error.message,
+          stack: error.stack,
+          original: error.original
+      });
+      res.status(500).json({ message: 'Authentication failed' });
   }
 };
 
@@ -110,7 +118,7 @@ exports.refreshToken = async (req, res) => {
     const newAccessToken = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '45m' }
     );
 
     res.json({ accessToken: newAccessToken });
@@ -269,23 +277,83 @@ exports.register = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const user = req.user;
-    if (!user) throw new Error('User not found');
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        first_name: user.first_name,
-        last_name: user.last_name
-      }
-    });
+      // Find user with department information
+      const user = await User.findOne({
+          where: { id: req.user.id },
+          include: [{
+              model: Department,
+              as: 'department',
+              attributes: ['id', 'name']
+          }]
+      });
+
+      if (!user) throw new Error('User not found');
+
+      res.status(200).json({
+          success: true,
+          data: {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+              first_name: user.first_name,
+              last_name: user.last_name,
+              department: user.department ? {
+                  id: user.department.id,
+                  name: user.department.name
+              } : null
+          }
+      });
   } catch (error) {
-    res.status(404).json({
-      success: false,
-      message: error.message
-    });
+      console.error('GetMe error:', error);
+      res.status(404).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  try {
+      const { first_name, last_name, current_password, new_password } = req.body;
+      const user = await User.findByPk(req.user.id);
+
+      if (!user) {
+          return res.status(404).json({ 
+              success: false, 
+              message: 'User not found' 
+          });
+      }
+
+      // If updating password
+      if (current_password && new_password) {
+          const validPassword = await bcrypt.compare(current_password, user.password);
+          if (!validPassword) {
+              return res.status(400).json({ 
+                  success: false, 
+                  message: 'Current password is incorrect' 
+              });
+          }
+          user.password = await bcrypt.hash(new_password, 10);
+      }
+
+      // Update basic info
+      if (first_name) user.first_name = first_name;
+      if (last_name) user.last_name = last_name;
+
+      await user.save();
+
+      res.status(200).json({
+          success: true,
+          data: {
+              id: user.id,
+              email: user.email,
+              role: user.role,
+              first_name: user.first_name,
+              last_name: user.last_name
+          }
+      });
+  } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(500).json({ 
+          success: false, 
+          message: 'Failed to update profile' 
+      });
   }
 };
