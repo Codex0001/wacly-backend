@@ -1,4 +1,3 @@
-// Change from object-based exports to direct middleware functions
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 

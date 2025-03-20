@@ -15,4 +15,6 @@ router.post('/', protect, restrictTo('admin'), createLeaveType);
 router.put('/:id', protect, restrictTo('admin'), updateLeaveType);
 router.delete('/:id', protect, restrictTo('admin'), deleteLeaveType);
 
+
+
 module.exports = router;

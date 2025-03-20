@@ -4,105 +4,191 @@ const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
 
+  exports.getDepartmentById = async (req, res) => {
+      try {
+          const department = await Department.findByPk(req.params.id, {
+              attributes: ['id', 'name', 'description'],
+              include: [{
+                  model: User,
+                  as: 'manager',
+                  attributes: ['id', 'first_name', 'last_name', 'email']
+              }]
+          });
+
+          if (!department) {
+              return res.status(404).json({
+                  success: false,
+                  message: 'Department not found'
+              });
+          }
+
+          res.json({
+              success: true,
+              data: department
+          });
+      } catch (error) {
+          res.status(500).json({
+              success: false,
+              message: 'Error fetching department',
+              error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
+      }
+  };
+
+  exports.getDepartmentUsers = async (req, res) => {
+      try {
+          // Check if user is manager and trying to access other department
+          if (req.user.role === 'manager' && req.user.department_id !== req.params.id) {
+              return res.status(403).json({
+                  success: false,
+                  message: 'Access denied. Managers can only view their own department'
+              });
+          }
+
+          const users = await User.findAll({
+              where: {
+                  department_id: req.params.id,
+                  role: ['employee', 'manager']
+              },
+              attributes: ['id', 'first_name', 'last_name', 'email', 'department_id', 'role'],
+              order: [
+                  ['first_name', 'ASC'],
+                  ['last_name', 'ASC']
+              ]
+          });
+
+          res.json({
+              success: true,
+              count: users.length,
+              data: users
+          });
+      } catch (error) {
+          res.status(500).json({
+              success: false,
+              message: 'Error fetching department users',
+              error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
+      }
+  };
 
   exports.createDepartment = async (req, res) => {
-    try {
-      // Validate if manager exists if provided
-      if (req.body.manager_id) {
-        const manager = await User.findByPk(req.body.manager_id);
-        if (!manager) {
-          return res.status(400).json({ message: 'Manager user not found' });
-        }
-      }
+      try {
+          if (req.body.manager_id) {
+              const manager = await User.findByPk(req.body.manager_id);
+              if (!manager) {
+                  return res.status(400).json({
+                      success: false,
+                      message: 'Manager user not found'
+                  });
+              }
+          }
 
-      const department = await Department.create({
-        name: req.body.name,
-        description: req.body.description,
-        manager_id: req.body.manager_id
-      });
-      
-      res.status(201).json(department);
-    } catch (error) {
-      res.status(400).json({ message: 'Error creating department' });
-    }
+          const department = await Department.create({
+              name: req.body.name,
+              description: req.body.description,
+              manager_id: req.body.manager_id
+          });
+
+          res.status(201).json({
+              success: true,
+              data: department
+          });
+      } catch (error) {
+          res.status(400).json({
+              success: false,
+              message: 'Error creating department',
+              error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
+      }
   };
 
   exports.updateDepartment = async (req, res) => {
-    try {
-      const department = await Department.findByPk(req.params.id);
-      if (!department) return res.status(404).json({ message: 'Department not found' });
+      try {
+          const department = await Department.findByPk(req.params.id);
+          if (!department) {
+              return res.status(404).json({
+                  success: false,
+                  message: 'Department not found'
+              });
+          }
 
-      // Validate new manager if provided
-      if (req.body.manager_id) {
-        const newManager = await User.findByPk(req.body.manager_id);
-        if (!newManager) {
-          return res.status(400).json({ message: 'New manager not found' });
-        }
+          if (req.body.manager_id) {
+              const newManager = await User.findByPk(req.body.manager_id);
+              if (!newManager) {
+                  return res.status(400).json({
+                      success: false,
+                      message: 'New manager not found'
+                  });
+              }
+          }
+
+          await department.update({
+              name: req.body.name || department.name,
+              description: req.body.description || department.description,
+              manager_id: req.body.manager_id ?? department.manager_id
+          });
+
+          res.json({
+              success: true,
+              data: department
+          });
+      } catch (error) {
+          res.status(400).json({
+              success: false,
+              message: 'Error updating department',
+              error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
       }
-
-      await department.update({
-        name: req.body.name || department.name,
-        description: req.body.description || department.description,
-        manager_id: req.body.manager_id ?? department.manager_id // Nullish coalescing
-      });
-
-      res.json(department);
-    } catch (error) {
-      res.status(400).json({ message: 'Error updating department' });
-    }
   };
 
-  // Get all departments with optional manager and employee count
   exports.getAllDepartments = async (req, res) => {
-    try {
-        const departments = await Department.findAll({
-            include: [{
-                model: User,
-                as: 'manager',
-                attributes: ['id', 'email', 'first_name', 'last_name'],
-                required: false // Makes it a LEFT JOIN
-            }],
-            attributes: {
-                include: [
-                    [
-                        sequelize.literal(`(
-                            SELECT COUNT(*)
-                            FROM Users
-                            WHERE Users.department_id = Department.id
-                            AND Users.id LIKE 'WACLY-EMP-%'
-                        )`),
-                        'employee_count'
-                    ]
-                ]
-            },
-            order: [['created_at', 'DESC']]
-        });
+      try {
+          const departments = await Department.findAll({
+              include: [{
+                  model: User,
+                  as: 'manager',
+                  attributes: ['id', 'email', 'first_name', 'last_name'],
+                  required: false
+              }],
+              attributes: {
+                  include: [
+                      [
+                          sequelize.literal(
+                              `(SELECT COUNT(*) FROM Users WHERE Users.department_id = Department.id AND Users.id LIKE 'WACLY-EMP-%')`
+                          ),
+                          'employee_count'
+                      ]
+                  ]
+              },
+              order: [['created_at', 'DESC']]
+          });
 
-        // Process the departments to ensure proper format
-        const processedDepartments = departments.map(dept => {
-            const deptData = dept.get({ plain: true });
-            return {
-                ...deptData,
-                employee_count: parseInt(deptData.employee_count || 0),
-                manager: deptData.manager ? {
-                    id: deptData.manager.id,
-                    first_name: deptData.manager.first_name,
-                    last_name: deptData.manager.last_name,
-                    email: deptData.manager.email
-                } : null
-            };
-        });
+          const processedDepartments = departments.map(dept => {
+              const deptData = dept.get({ plain: true });
+              return {
+                  ...deptData,
+                  employee_count: parseInt(deptData.employee_count || 0),
+                  manager: deptData.manager ? {
+                      id: deptData.manager.id,
+                      first_name: deptData.manager.first_name,
+                      last_name: deptData.manager.last_name,
+                      email: deptData.manager.email
+                  } : null
+              };
+          });
 
-        res.json(processedDepartments);
-
-    } catch (error) {
-        console.error('Error fetching departments:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching departments',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
+          res.json({
+              success: true,
+              count: processedDepartments.length,
+              data: processedDepartments
+          });
+      } catch (error) {
+          res.status(500).json({
+              success: false,
+              message: 'Error fetching departments',
+              error: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
+      }
   };
 
   exports.deleteDepartment = async (req, res) => {

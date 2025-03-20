@@ -3,14 +3,15 @@ const express = require('express');
 const router = express.Router();
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 const { validateLeaveRequest, validateLeaveAction } = require('../middleware/leaveMiddleware');
-const {
-    createLeaveRequest,
-    getAllLeaveRequests,
-    getMyLeaveRequests,
-    getTeamLeaveRequests,
-    updateLeaveRequestStatus,
-    getLeaveRequestStats,
-    getDashboardStats
+const { 
+    createLeaveRequest, 
+    getAllLeaveRequests, 
+    getMyLeaveRequests, 
+    getTeamLeaveRequests, 
+    updateLeaveRequestStatus, 
+    getLeaveRequestStats, 
+    getDashboardStats,
+    getDepartmentStats
 } = require('../controllers/leaveController');
 
 // Leave Requests routes
@@ -48,6 +49,17 @@ router.put('/:id/status',
     validateLeaveAction, 
     updateLeaveRequestStatus
 );
-router.get('/dashboard-stats', protect, getDashboardStats);
+
+router.get('/dashboard-stats', 
+    protect, 
+    getDashboardStats
+);
+
+// New department statistics route
+router.get('/department-stats',
+    protect,
+    restrictTo('manager'),
+    getDepartmentStats
+);
 
 module.exports = router;

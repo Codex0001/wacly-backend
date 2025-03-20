@@ -3,8 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const sequelize = require('./src/config/db');
-const { User, Department, LeaveType, LeaveRequest, Attendance } = require('./src/models');
-
+const { User, Department, LeaveType, LeaveRequest, Attendance, Shift, Schedule } = require('./src/models');
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -12,8 +11,8 @@ const port = process.env.PORT || 5000;
 app.use(cors({
     origin: 'http://localhost:3000',
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', ],
-    allowedHeaders: ['Content-Type', 'Authorization','Accept'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
 }));
 
 // Body parser
@@ -29,6 +28,8 @@ app.use('/api/users', require('./src/routes/userRoutes'));
 app.use('/api/leave-types', require('./src/routes/leaveRoutes'));
 app.use('/api/leave-requests', require('./src/routes/leaveRequestRoutes'));
 app.use('/api/attendance', require('./src/routes/attendanceRoutes'));
+app.use('/api/shifts', require('./src/routes/shiftRoutes'));
+app.use('/api/schedules', require('./src/routes/scheduleRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -51,6 +52,10 @@ async function verifyTables() {
         console.log('✨ Created leave_requests table');
         await Attendance.sync();
         console.log('✨ Created attendance_logs table');
+        await Shift.sync();
+        console.log('✨ Created shifts table');
+        await Schedule.sync();
+        console.log('✨ Created schedules table');
 
         // Verify all tables
         const tables = {
@@ -58,7 +63,9 @@ async function verifyTables() {
             departments: Department,
             leave_types: LeaveType,
             leave_requests: LeaveRequest,
-            attendance_logs: Attendance
+            attendance_logs: Attendance,
+            shifts: Shift,
+            schedules: Schedule
         };
 
         for (const [tableName, model] of Object.entries(tables)) {
@@ -101,6 +108,39 @@ async function verifyTables() {
             ]);
             console.log('📝 Created default leave types');
         }
+
+        // Create default shifts if table is empty
+        const shiftsCount = await Shift.count();
+        if (shiftsCount === 0) {
+            await Shift.bulkCreate([
+                {
+                    name: 'Morning Shift',
+                    start_time: '08:00:00',
+                    end_time: '16:00:00',
+                    description: 'Standard day shift',
+                    status: 'active',
+                    created_by: 'WACLY-ADM-0001'
+                },
+                {
+                    name: 'Evening Shift',
+                    start_time: '16:00:00',
+                    end_time: '00:00:00',
+                    description: 'Standard evening shift',
+                    status: 'active',
+                    created_by: 'WACLY-ADM-0001'
+                },
+                {
+                    name: 'Night Shift',
+                    start_time: '00:00:00',
+                    end_time: '08:00:00',
+                    description: 'Standard night shift',
+                    status: 'active',
+                    created_by: 'WACLY-ADM-0001'
+                }
+            ]);
+            console.log('⏰ Created default shifts');
+        }
+
     } catch (error) {
         console.error('❌ Error during table verification:', error);
         throw error;
@@ -115,10 +155,7 @@ async function initializeSystem() {
         await verifyTables();
 
         // Create default admin if not exists
-        const adminExists = await User.findOne({
-            where: { email: 'admin@wacly.com' }
-        });
-
+        const adminExists = await User.findOne({ where: { email: 'admin@wacly.com' } });
         if (!adminExists) {
             const hashedPassword = await bcrypt.hash('Admin@1234', 10);
             await User.create({
@@ -130,6 +167,12 @@ async function initializeSystem() {
                 role: 'admin'
             });
             console.log('💼 Default admin created');
+
+            // After creating admin, create default shifts
+            const shiftsCount = await Shift.count();
+            if (shiftsCount === 0) {
+                await initializeDefaultShifts();
+            }
         }
 
         app.listen(port, () => {
@@ -138,6 +181,42 @@ async function initializeSystem() {
     } catch (error) {
         console.error('💥 Failed to initialize:', error);
         process.exit(1);
+    }
+}
+
+// Helper function to initialize default shifts
+async function initializeDefaultShifts() {
+    try {
+        await Shift.bulkCreate([
+            {
+                name: 'Morning Shift',
+                start_time: '08:00:00',
+                end_time: '16:00:00',
+                description: 'Standard day shift',
+                status: 'active',
+                created_by: 'WACLY-ADM-0001'
+            },
+            {
+                name: 'Evening Shift',
+                start_time: '16:00:00',
+                end_time: '00:00:00',
+                description: 'Standard evening shift',
+                status: 'active',
+                created_by: 'WACLY-ADM-0001'
+            },
+            {
+                name: 'Night Shift',
+                start_time: '00:00:00',
+                end_time: '08:00:00',
+                description: 'Standard night shift',
+                status: 'active',
+                created_by: 'WACLY-ADM-0001'
+            }
+        ]);
+        console.log('⏰ Created default shifts');
+    } catch (error) {
+        console.error('Failed to create default shifts:', error);
+        throw error;
     }
 }
 

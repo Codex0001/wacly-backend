@@ -1,3 +1,4 @@
+// src/models/index.js
 const { Sequelize, DataTypes } = require('sequelize');
 const config = require('../config/db');
 const bcrypt = require('bcrypt');
@@ -29,6 +30,8 @@ const Department = require('./Department');
 const LeaveType = require('./LeaveType')(sequelize, DataTypes);
 const LeaveRequest = require('./LeaveRequest')(sequelize, DataTypes);
 const Attendance = require('./Attendance')(sequelize, DataTypes);
+const Shift = require('./Shift');
+const Schedule = require('./Schedule');
 
 // Fix circular dependencies
 User.Department = User.belongsTo(Department, {
@@ -78,6 +81,43 @@ User.hasMany(Attendance, {
     as: 'attendanceLogs'
 });
 
+// Schedule and Shift associations
+Schedule.belongsTo(Shift, {
+    foreignKey: 'shift_id',
+    as: 'shift',
+    onDelete: 'CASCADE'
+});
+
+Schedule.belongsToMany(User, {
+    through: 'schedule_employees',
+    foreignKey: 'schedule_id',
+    otherKey: 'user_id',
+    as: 'employees'
+});
+
+User.belongsToMany(Schedule, {
+    through: 'schedule_employees',
+    foreignKey: 'user_id',
+    otherKey: 'schedule_id',
+    as: 'schedules'
+});
+
+Shift.hasMany(Schedule, {
+    foreignKey: 'shift_id',
+    as: 'schedules'
+});
+
+// Department-Shift association
+Shift.belongsTo(Department, {
+    foreignKey: 'department_id',
+    as: 'department'
+});
+
+Department.hasMany(Shift, {
+    foreignKey: 'department_id',
+    as: 'shifts'
+});
+
 // Database startup sequence
 sequelize.authenticate()
     .then(() => console.log('🔌 Connected to database'))
@@ -99,5 +139,7 @@ module.exports = {
     LeaveType,
     LeaveRequest,
     Attendance,
+    Shift,
+    Schedule,
     saltRounds: 10 // For password hashing
 };

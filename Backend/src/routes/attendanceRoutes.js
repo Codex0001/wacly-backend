@@ -7,31 +7,16 @@ const { protect, restrictTo } = require('../middleware/authMiddleware');
 router.post('/clock-in', protect, attendanceController.clockIn);
 router.post('/clock-out', protect, attendanceController.clockOut);
 router.get('/active-session', protect, attendanceController.getActiveSession);
-router.get('/today', protect, attendanceController.getTodayAttendance);
-router.get('/history', protect, attendanceController.getAttendanceHistory);
+
+// Get attendance records
+router.get('/all', protect, attendanceController.getAllAttendance);
+
+// Statistics and Reports
 router.get('/statistics', protect, attendanceController.getStatistics);
+router.get('/report', protect, restrictTo('admin', 'manager'), attendanceController.getReport);
 
-// Manager routes
-router.get(
-    '/department', 
-    protect,
-    restrictTo('manager', 'admin'),
-    attendanceController.getDepartmentAttendance
-);
+// Department specific routes
+router.get('/department', protect, restrictTo('manager', 'admin'), attendanceController.getDepartmentAttendance);
 
-// Admin routes
-router.get(
-    '/all', 
-    protect,
-    restrictTo('admin'),
-    attendanceController.getAllAttendance
-);
-
-router.get(
-    '/report', 
-    protect,
-    restrictTo('admin', 'manager'),
-    attendanceController.getReport
-);
-
+// Export routes
 module.exports = router;

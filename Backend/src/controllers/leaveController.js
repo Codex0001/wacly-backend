@@ -489,3 +489,132 @@ exports.getDashboardStats = async (req, res) => {
         });
     }
 };
+
+exports.getDepartmentStats = async (req, res) => {
+    try {
+      const { timeframe = 'year' } = req.query;
+      const now = new Date();
+      
+      // Calculate start date based on timeframe
+      let startDate;
+      switch (timeframe) {
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          break;
+        case 'quarter':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          break;
+        case 'year':
+        default:
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+      }
+  
+      // Get all leave requests for the department within the timeframe
+      const requests = await LeaveRequest.findAll({
+        include: [
+          {
+            model: User,
+            as: 'user',
+            where: { department_id: req.user.department_id },
+            attributes: ['first_name', 'last_name'],
+          },
+          {
+            model: LeaveType,
+            as: 'leaveType',
+            attributes: ['name', 'days_allowed'],
+          }
+        ],
+        where: {
+          created_at: {
+            [Op.gte]: startDate,
+            [Op.lte]: now
+          }
+        }
+      });
+  
+      // Calculate basic stats
+      const totalRequests = requests.length;
+      const pendingRequests = requests.filter(r => r.status === 'Pending').length;
+      const approvedRequests = requests.filter(r => r.status === 'Approved').length;
+      const rejectedRequests = requests.filter(r => r.status === 'Rejected').length;
+  
+      // Calculate leave types usage
+      const leaveTypesUsage = {};
+      const leaveTypes = await LeaveType.findAll({
+        where: { status: 'Active' }
+      });
+  
+      for (const type of leaveTypes) {
+        const typeRequests = requests.filter(r => 
+          r.leave_type_id === type.id && r.status === 'Approved'
+        );
+        const used = typeRequests.reduce((sum, r) => sum + r.number_of_days, 0);
+        
+        leaveTypesUsage[type.name] = {
+          used,
+          total: type.days_allowed
+        };
+      }
+  
+      // Calculate monthly statistics
+      const monthlyStats = {};
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+  
+      requests.forEach(request => {
+        const month = months[new Date(request.created_at).getMonth()];
+        
+        if (!monthlyStats[month]) {
+          monthlyStats[month] = {
+            approved: 0,
+            rejected: 0,
+            pending: 0
+          };
+        }
+  
+        switch (request.status) {
+          case 'Approved':
+            monthlyStats[month].approved++;
+            break;
+          case 'Rejected':
+            monthlyStats[month].rejected++;
+            break;
+          case 'Pending':
+            monthlyStats[month].pending++;
+            break;
+        }
+      });
+  
+      // Additional statistics
+      const averageProcessingTime = requests
+        .filter(r => r.status !== 'Pending' && r.action_at)
+        .reduce((sum, r) => {
+          const processTime = new Date(r.action_at).getTime() - new Date(r.created_at).getTime();
+          return sum + processTime;
+        }, 0) / approvedRequests || 0;
+  
+      res.json({
+        success: true,
+        data: {
+          total_requests: totalRequests,
+          pending_requests: pendingRequests,
+          approved_requests: approvedRequests,
+          rejected_requests: rejectedRequests,
+          leave_types_usage: leaveTypesUsage,
+          monthly_stats: monthlyStats,
+          average_processing_time: Math.round(averageProcessingTime / (1000 * 60 * 60 * 24)), // Convert to days
+          timeframe_start: startDate,
+          timeframe_end: now
+        }
+      });
+  
+    } catch (error) {
+      console.error('Department stats error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching department statistics',
+        error: error.message
+      });
+    }
+};
